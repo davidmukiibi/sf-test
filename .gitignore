@@ -1,0 +1,5 @@
+*.cert
+*.key
+.DS_Store
+pkg
+src/*

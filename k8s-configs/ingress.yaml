@@ -1,0 +1,30 @@
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   annotations:
+#     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+#     kubernetes.io/ingress.class: "nginx"
+#     nginx.ingress.kubernetes.io/affinity: "cookie"
+#     nginx.ingress.kubernetes.io/session-cookie-name: "scaling-funds"
+#     nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+#   name: scaling-funds-ingress
+#   namespace: default
+# spec:
+#   rules:
+#   - host: go-safeboda.info
+#     http:
+#       paths:
+#         - path: /
+#           pathType: Prefix
+#           backend:
+#             service:
+#               name: scaling-funds-svc
+#               port:
+#                 number: 3000
+#         - path: /safe-boda
+#           pathType: Prefix
+#           backend:
+#             service:
+#               name: scaling-funds-svc
+#               port:
+#                 number: 3000

@@ -1,0 +1,31 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: scaling-funds
+  namespace: default
+  labels:
+    run: scaling-funds
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: scaling-funds
+  strategy:
+    rollingUpdate:
+      maxSurge: "30%"
+      maxUnavailable: "30%"
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        run: scaling-funds
+    spec:
+      containers:
+      - name: scaling-funds
+        image: gcr.io/personal-project-249716/scaling-funds-api:v1
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        imagePullPolicy: IfNotPresent
+      imagePullSecrets:
+      - name: mycreds

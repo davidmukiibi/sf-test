@@ -1,0 +1,15 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: scaling-funds-svc
+  namespace: default
+  labels:
+    run: scaling-funds-svc
+spec:
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  selector:
+    run: scaling-funds
+  type: LoadBalancer
