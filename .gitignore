@@ -3,4 +3,5 @@
 .DS_Store
 pkg
 src/*
-terraform-configs/gke-public-cluster/.terraform
+terraform-configs/gke-public-cluster/.terraform/*
+
