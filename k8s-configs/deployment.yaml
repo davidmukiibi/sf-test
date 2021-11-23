@@ -28,4 +28,4 @@ spec:
           protocol: TCP
         imagePullPolicy: IfNotPresent
       imagePullSecrets:
-      - name: mycreds
+      - name: private-docker-creds

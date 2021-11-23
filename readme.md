@@ -1,56 +1,22 @@
-# SafeBoda on Minikube
+# Scaling Funds on GKE
 
-A simple "Hello World" application written in Golang and Deployed on Minikube
+A simple "Hello scaling funds" application written in Golang and Deployed on GKE
 
-## Step 1: Start Minikube
+I deployed this app on GKE as instructed with the help of terraform.
 
-Run the command below in the your terminal:
+Dockerized tghe application and pushed the docker image to my docker repository.
 
-```docker
-minikube start && eval $(minikube docker-env)
-```
+Deployed the appliction with the help of kubectl.
 
-## Step 2: Dockerize
+Used github actions as the CI/CD tool of choice.
 
-Run the command below in the same directory that has the "dockerfile"
+After the application is deployed, fetch the k8s services and use the loadbalancer IP and port number to see the contents of the page. A simple json payload.
 
-```docker
-docker build -t mukiibi/safeboda:v10 .
-```
+## Gotchas
 
-## Step 3: Deploy to Minikube
+- I did not use a private cluster and a better load balancer. To make it better, i'd use a fully fledged google load balancer, or any other of my choice as they are now supported in the current version of kubernetes.
+- I used docker registry simply because the service account file was giving me a lot of json debugging issues in the deployment spec as well as terraform cloud. Ran away from them as i couldn't debug them in time.
+- I added the back bone infrastructure code along with the applicaiton code and differentiate them with 2 different workflow files which are triggered when certain files are changed. Ideally the back bone infra should reside in its own repo and maintained separately.
+- Currently the app is not running because i tore down the cluster for cloud cost reasons.
 
-```kubernetes
-kubectl create secrets.yaml
-kubectl create services.yaml
-kubectl create ingress.yaml
-kubectl create deployments.yaml
-```
-
-## SSL certificate
-I generated self signed certificates for the domain "go-safeboda.info" using this site:
-
-```
-https://www.selfsignedcertificate.com/
-```
-
-I later encoded them using base64 with command:
-
-```bash
-cat go-safeboda.info.cert | base64
-cat go-safeboda.info.key | base64
-```
-
-I then copied the results to the secrets file appropriately.
-
-And Viola, you have your hello world application hosted on Minikube as I would in production.
-
-In your web browser, visit:
-```
-go-safeboda.info
-```
-or
-```
-go-safeboda.info/safe
-```
-to see the magic!
+Terraform configurations files can be found in the folder `./terraform-configs` and the kubernetes deployment files can be found in the folder `./k8s-configs` and the workflow file in `./.github/workflows`

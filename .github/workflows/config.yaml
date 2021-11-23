@@ -3,16 +3,23 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'terraform-configs/gke-public-cluster/**'
+      - '.github/workflows/**'
 env:
   PROJECT_ID: ${{ secrets.GKE_PROJECT }}
   GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }}
   GKE_ZONE: ${{ secrets.GKE_ZONE }}
   DEPLOYMENT_NAME: ${{ secrets.DEPLOYMENT_NAME }}
-  IMAGE: ${{ secrets.IMAGE }}
+  IMAGE: ${{ secrets.DEFAULT_IMAGE }}
+  GKE_SA_KEY: ${{ secrets.GKE_SA_KEY }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_EMAIL: ${{ secrets.DOCKER_EMAIL }}
 
 jobs:
   test:
-    name: Test job
+    name: Run tests
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout
@@ -30,61 +37,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      # Setup gcloud CLI
+      - uses: google-github-actions/setup-gcloud@94337306dda8180d967a56932ceb4ddcf01edae7
+        with:
+          service_account_key: ${{ secrets.GKE_SA_KEY }}
+          project_id: ${{ secrets.GKE_PROJECT }}
+
+      - name: Docker login
+        run: |-
+          docker login --username=$DOCKER_USERNAME --password=$DOCKER_PASSWORD
+
       - name: Build an image from Dockerfile
         run: |
-          docker build -t gcr.io/${{ secrets.PROJECT_ID }}/scaling-funds-api:${{ github.sha }} .
-          # docker build \
-          # --tag "gcr.io/$PROJECT_ID/$IMAGE:$GITHUB_SHA" \
-          # --build-arg GITHUB_SHA="$GITHUB_SHA" \
-          # --build-arg GITHUB_REF="$GITHUB_REF" \
-          # .
+          docker build -t mukiibi/scaling-funds-api:$GITHUB_SHA .
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'gcr.io/${{ secrets.PROJECT_ID }}/scaling-funds-api:${{ github.sha }}'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
-      # Push the Docker image to Google Container Registry
+      # Push the Docker image to Docker Registry
       - name: Publish
         run: |-
-          docker push "gcr.io/${{ secrets.PROJECT_ID }}/scaling-funds-api:${{ github.sha }}"
+          docker push "mukiibi/scaling-funds-api:$GITHUB_SHA"
 
-  deploy-infrastructure:
-    name: Deployment job
-    needs: [test, build-test-docker-image]
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - uses: hashicorp/setup-terraform@v1
-        with:
-          terraform_version: 1.0.10
-
-      - name: Terraform Format
-        id: fmt
-        run: terraform fmt -check
-
-      - name: Initialize terraform
-        run: terraform init
-
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
-
-      - id: plan
-        run: terraform plan -no-color
-
-      - id: apply
-        run: terraform apply -auto-approve
+      # - name: Run Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: 'mukiibi/scaling-funds-api:$GITHUB_SHA'
+      #     format: 'table'
+      #     exit-code: '1'
+      #     ignore-unfixed: true
+      #     vuln-type: 'os,library'
+      #     severity: 'CRITICAL,HIGH'
 
   deploy-k8s-deployment:
     name: update k8s deployment
+    needs: [build-test-docker-image]
     runs-on: ubuntu-latest
 
     steps:
@@ -106,20 +90,35 @@ jobs:
     # Get the GKE credentials so we can deploy to the cluster
     - uses: google-github-actions/get-gke-credentials@fb08709ba27618c31c09e014e1d8364b02e5042e
       with:
-        cluster_name: ${{ env.GKE_CLUSTER }}
-        location: ${{ env.GKE_ZONE }}
+        cluster_name: ${{ secrets.GKE_CLUSTER }}
+        location: ${{ secrets.GKE_LOCATION }}
         credentials: ${{ secrets.GKE_SA_KEY }}
 
-    # Set up kustomize
-    - name: Set up Kustomize
+    # # Set up kustomize
+    # - name: Set up Kustomize
+    #   run: |-
+    #     curl -sfLo kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64
+    #     chmod u+x ./kustomize
+
+    - name: create docker secret
+      if: ${{ failure() }}
       run: |-
-        curl -sfLo kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64
-        chmod u+x ./kustomize
+        kubectl create secret docker-registry private-docker-creds \
+        --docker-server="https://index.docker.io/v1/" \
+        --docker-username=$DOCKER_USERNAME \
+        --docker-password=$DOCKER_PASSWORD \
+        --docker-email=$DOCKER_EMAIL
+
+    - name: patch service account
+      run: |-
+        kubectl patch serviceaccount default \
+        -p '{"imagePullSecrets": [{"name": "private-docker-creds"}]}'
+
 
     # Deploy the Docker image to the GKE cluster
     - name: Deploy
       run: |-
-        ./kustomize edit set image gcr.io/${{ secrets.PROJECT_ID }}/scaling-funds-api:v1=gcr.io/$PROJECT_ID/scaling-funds-api:$GITHUB_SHA
-        ./kustomize build ./k8s-configs/ | kubectl apply -f -
+        # kubectl apply -f ./k8s-configs/
+        kubectl set image deployment/scaling-funds scaling-funds=mukiibi/scaling-funds-api:$GITHUB_SHA
         kubectl rollout status deployment/$DEPLOYMENT_NAME
         kubectl get services -o wide

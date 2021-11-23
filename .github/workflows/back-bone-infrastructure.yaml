@@ -1,0 +1,61 @@
+name: Terraform
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform-configs/gke-public-cluster/**'
+      - '.github/workflows/**'
+env:
+  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }}
+  GKE_ZONE: ${{ secrets.GKE_ZONE }}
+  DEPLOYMENT_NAME: ${{ secrets.DEPLOYMENT_NAME }}
+  IMAGE: ${{ secrets.DEFAULT_IMAGE }}
+  GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GKE_SA_KEY }}
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./terraform-configs/gke-public-cluster
+
+jobs:
+  deploy-infrastructure:
+    name: Update backbone infrastructure
+    runs-on: ubuntu-18.04
+    # working-directory: ./terraform-configs/gke-public-cluster
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.10
+          cli_config_credentials_token: ${{ secrets.TFE_TOKEN }}
+
+      # Setup gcloud CLI
+      - uses: google-github-actions/setup-gcloud@94337306dda8180d967a56932ceb4ddcf01edae7
+        with:
+          service_account_key: ${{ secrets.GKE_SA_KEY }}
+          project_id: ${{ secrets.GKE_PROJECT }}
+
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Terraform initialize
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform plan
+        id: plan
+        run: terraform plan -no-color
+
+      - name: Terraform apply
+        id: apply
+        run: terraform apply -auto-approve
+
