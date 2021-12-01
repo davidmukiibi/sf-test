@@ -31,7 +31,7 @@ var SecondEndPoint = http.HandlerFunc(func(w http.ResponseWriter, r *http.Reques
 
     var message Message
 
-    message.Response = "Yes, Scaling funds Is The best Out There."
+    message.Response = "Yes, Scaling funds Is The best Out There. And i'm sure about that!!!!"
     message.StatusCode = 200
     jsonmessage, _ := json.Marshal(message)
     w.Write([]byte(jsonmessage))
