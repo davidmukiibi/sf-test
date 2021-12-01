@@ -44,3 +44,5 @@ func main() {
     router.Handle("/scalingfunds", SecondEndPoint).Methods("GET")
 	log.Fatal(http.ListenAndServe(":3000", handlers.LoggingHandler(os.Stdout, router)))
 }
+
+
